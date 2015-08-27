@@ -32,6 +32,9 @@
  * 'update': function(event, response) { }
  * Triggered through widget.update if a item has been changed.
  *
+ * 'draw': function (event) { }
+ * Triggered only for svgs, if it is loaded
+ * 
  * 'point': function(event, response) { }
  * Triggerd only for plots through widget.update if the plot is already drawn
  * and only a new point has to be added to the series.
@@ -51,7 +54,7 @@
 
 	// ----- basic.button ---------------------------------------------------------
 $(document).delegate('a[data-widget="basic.button"]', {
-	'click' : function (event) {
+	'click': function (event) {
 		if ($(this).attr('data-val') != '') {
 			io.write($(this).attr('data-item'), $(this).attr('data-val'));
 		}
@@ -60,11 +63,11 @@ $(document).delegate('a[data-widget="basic.button"]', {
 
 // ----- basic.checkbox --------------------------------------------------------
 $(document).delegate('input[data-widget="basic.checkbox"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		$(this).prop('checked', response != 0).checkboxradio('refresh');
 	},
 
-	'change' : function (event) {
+	'change': function (event) {
 		// DEBUG: console.log("[basic.checkbox] change '" + this.id + "':", $(this).prop("checked"));
 		io.write($(this).attr('data-item'), ($(this).prop('checked') ? 1 : 0));
 	}
@@ -72,14 +75,14 @@ $(document).delegate('input[data-widget="basic.checkbox"]', {
 
 // ----- basic.colordisc ------------------------------------------------------
 $(document).delegate('a[data-widget="basic.colordisc"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_r }}, {{ gad_g }}, {{ gad_b }}
 
 		var max = $(this).attr('data-max');
 		$('#' + this.id + ' span').css('background-color', 'rgb(' + Math.round(response[0] / max * 255) + ',' + Math.round(response[1] / max * 255) + ',' + Math.round(response[2] / max * 255) + ')');
 	},
 
-	'click' : function (event) {
+	'click': function (event) {
 		$('#' + this.id + '-screen').removeClass('hide').addClass('in');
 
 		// reposition canvas
@@ -95,7 +98,7 @@ $(document).delegate('a[data-widget="basic.colordisc"]', {
 });
 
 $(document).delegate('div[data-widget="basic.colordisc"]', {
-	'click' : function (event) {
+	'click': function (event) {
 		var uid = this.id.substr(0, this.id.length - 7);
 
 		$('#' + uid + '-disc').hide();
@@ -105,7 +108,7 @@ $(document).delegate('div[data-widget="basic.colordisc"]', {
 });
 
 $(document).delegate('canvas[data-widget="basic.colordisc"]', {
-	'init' : function (event) {
+	'init': function (event) {
 		var colors = parseFloat($(this).attr('data-colors'));
 		var size = 280;
 		var canvas = $(this)[0];
@@ -188,7 +191,7 @@ $(document).delegate('canvas[data-widget="basic.colordisc"]', {
 		}
 	},
 
-	'click' : function (event) {
+	'click': function (event) {
 		var uid = this.id.substr(0, this.id.length - 5);
 		var disc = $(this)[0];
 		var ctx = disc.getContext("2d");
@@ -214,38 +217,51 @@ $(document).delegate('canvas[data-widget="basic.colordisc"]', {
 
 // ----- basic.dual -----------------------------------------------------------
 $(document).delegate('a[data-widget="basic.dual"]', {
-	'update' : function (event, response) {
-		$('#' + this.id + ' img').attr('src', (response == $(this).attr('data-val-on') ? $(this).attr('data-pic-on') : $(this).attr('data-pic-off')));
+	'update': function (event, response) {
+		$(this).val(response);
+		$(this).trigger('draw');
 	},
 
-	'click' : function (event) {
-		if ($('#' + this.id + ' img').attr('src') == $(this).attr('data-pic-off')) {
-			io.write($(this).attr('data-item'), $(this).attr('data-val-on'));
+	'draw': function(event) {
+		if($(this).val() == $(this).attr('data-val-on')) {
+			$('#' + this.id + '-off').hide();
+			$('#' + this.id + '-on').show();
 		}
 		else {
-			io.write($(this).attr('data-item'), $(this).attr('data-val-off'));
+			$('#' + this.id + '-on').hide();
+			$('#' + this.id + '-off').show();
 		}
+	},
+
+	'click': function (event) {
+		io.write($(this).attr('data-item'), ($(this).val() == $(this).attr('data-val-off') ? $(this).attr('data-val-on') : $(this).attr('data-val-off')) );
 	}
 });
 
 // ----- basic.multistate ------------------------------------------------------
 $(document).delegate('a[data-widget="basic.multistate"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// get list of values and images
 		list_val = $(this).attr('data-vals').explode();
 		list_img = $(this).attr('data-img').explode();
+		
 		// get the index of the value received
 		idx = list_val.indexOf(response.toString());
+		
 		// update the image
 		$('#' + this.id + ' img').attr('src', list_img[idx]);
+		
 		// memorise the index for next use
-		$(this).attr('index-mem', idx);
+		$(this).val(idx);
 	},
-	'click'  : function (event) {
+	
+	'click': function (event) {
 		// get the list of values
 		list_val = $(this).attr('data-vals').explode();
+		
 		// get the last index memorised
-		old_idx = parseInt($(this).attr('index-mem'));
+		old_idx = parseInt($(this).val());
+		
 		//compute the next index
 		var new_idx = old_idx + 1;
 		if (new_idx >= list_val.length) {
@@ -253,18 +269,19 @@ $(document).delegate('a[data-widget="basic.multistate"]', {
 		}
 		// send the value to driver
 		io.write($(this).attr('data-item'), list_val[new_idx]);
+		
 		// memorise the index for next use
-		$(this).attr('index-mem', new_idx);
+		$(this).val(new_idx);
 	}
 });
 
 // ----- basic.flip -----------------------------------------------------------
 $(document).delegate('select[data-widget="basic.flip"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		$(this).val(response > 0 ? 'on' : 'off').slider('refresh');
 	},
 
-	'change' : function (event) {
+	'change': function (event) {
 		// DEBUG: console.log("[basic.flip] change '" + this.id + "':", $(this).val());
 		io.write($(this).attr('data-item'), ($(this).val() == 'on' ? 1 : 0));
 	}
@@ -272,7 +289,7 @@ $(document).delegate('select[data-widget="basic.flip"]', {
 
 // ----- basic.float ----------------------------------------------------------
 $(document).delegate('[data-widget="basic.float"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		if ($(this).attr('data-unit') != '') {
 			$('#' + this.id).html(parseFloat(response).transUnit($(this).attr('data-unit')));
 		}
@@ -285,7 +302,7 @@ $(document).delegate('[data-widget="basic.float"]', {
 
 // ----- basic.formula ----------------------------------------------------------
 $(document).delegate('[data-widget="basic.formula"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		var calc = 0;
 		var pos = 0;
 		var unit = $(this).attr('data-unit');
@@ -335,7 +352,7 @@ $(document).delegate('[data-widget="basic.formula"]', {
 
 // ----- basic.rgb ------------------------------------------------------------
 $(document).delegate('a[data-widget="basic.rgb"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_r }}, {{ gad_g }}, {{ gad_b }}
 
 		var max = $(this).attr('data-max');
@@ -344,7 +361,7 @@ $(document).delegate('a[data-widget="basic.rgb"]', {
 });
 
 $(document).delegate('div[data-widget="basic.rgb-popup"] > div', {
-	'click' : function (event) {
+	'click': function (event) {
 		var rgb = $(this).css('background-color');
 		rgb = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
 
@@ -358,18 +375,18 @@ $(document).delegate('div[data-widget="basic.rgb-popup"] > div', {
 		$(this).parent().popup('close');
 	},
 
-	'mouseenter' : function (event) {
+	'mouseenter': function (event) {
 		$(this).addClass("ui-focus");
 	},
 
-	'mouseleave' : function (event) {
+	'mouseleave': function (event) {
 		$(this).removeClass("ui-focus");
 	}
 });
 
 // ----- basic.shifter ---------------------------------------------------------
 $(document).delegate('span[data-widget="basic.shifter"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 
 		var step = Math.min((response[0] / $(this).attr('data-max') * 10 + 0.49).toFixed(0) * 10, 100);
@@ -382,7 +399,7 @@ $(document).delegate('span[data-widget="basic.shifter"]', {
 		}
 	},
 
-	'click' : function (event) {
+	'click': function (event) {
 		var items = $(this).attr('data-item').explode();
 
 		if ($('#' + this.id + ' img').attr('src') == $(this).attr('data-pic-off')) {
@@ -405,7 +422,7 @@ $(document).delegate('span[data-widget="basic.shifter"] > a > img', 'hover', fun
 
 // ----- basic.shutter ---------------------------------------------------------
 $(document).delegate('div[data-widget="basic.shutter"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_pos }}, {{ gad_angle }}
 
 		var a = 13;
@@ -448,7 +465,7 @@ $(document).delegate('div[data-widget="basic.shutter"]', {
 		}
 	},
 
-	'click' : function (event) {
+	'click': function (event) {
 		var offset = $(this).offset();
 		var x = Math.round(event.pageX - offset.left);
 		var y = (event.pageY - offset.top);
@@ -464,11 +481,11 @@ $(document).delegate('div[data-widget="basic.shutter"]', {
 		}
 	},
 
-	'mouseenter' : function (event) {
+	'mouseenter': function (event) {
 		$('#' + this.id + ' .control').fadeIn(400);
 	},
 
-	'mouseleave' : function (event) {
+	'mouseleave': function (event) {
 		$('#' + this.id + ' .control').fadeOut(400);
 	}
 });
@@ -478,22 +495,22 @@ $(document).delegate('div[data-widget="basic.shutter"]', {
 // to stop the change after a refresh. And a timer is used to fire the trigger
 // only every 400ms if it was been moved. There should be no trigger on init.
 $(document).delegate('input[data-widget="basic.slider"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// DEBUG: console.log("[basic.slider] update '" + this.id + "': " + response + " timer: " + $(this).attr('timer') + " lock: " + $(this).attr('lock'));
 		$(this).attr('lock', 1);
 		$('#' + this.id).val(response).slider('refresh').attr('mem', $(this).val());
 	},
 
-	'slidestop' : function (event) {
+	'slidestop': function (event) {
 		if ($(this).val() != $(this).attr('mem')) {
 			io.write($(this).attr('data-item'), $(this).val());
 		}
 	},
 
-	'change' : function (event) {
+	'change': function (event) {
 		// DEBUG: console.log("[basic.slider] change '" + this.id + "': " + $(this).val() + " timer: " + $(this).attr('timer') + " lock: " + $(this).attr('lock'));
 		if (( $(this).attr('timer') === undefined || $(this).attr('timer') == 0 && $(this).attr('lock') == 0 )
-				&& ($(this).val() != $(this).attr('mem'))) {
+			&& ($(this).val() != $(this).attr('mem'))) {
 
 			if ($(this).attr('timer') !== undefined) {
 				$(this).trigger('click');
@@ -506,7 +523,7 @@ $(document).delegate('input[data-widget="basic.slider"]', {
 		$(this).attr('lock', 0);
 	},
 
-	'click' : function (event) {
+	'click': function (event) {
 		// $('#' + this.id).attr('mem', $(this).val());
 		io.write($(this).attr('data-item'), $(this).val());
 	}
@@ -514,11 +531,34 @@ $(document).delegate('input[data-widget="basic.slider"]', {
 
 // ----- basic.switch ---------------------------------------------------------
 $(document).delegate('span[data-widget="basic.switch"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
+		$(this).val(response);
+		$(this).trigger('draw');
+	},
+	
+	'draw': function(event) {
+		if($(this).val() == $(this).attr('data-val-on')) {
+			$('#' + this.id + '-off').hide();
+			$('#' + this.id + '-on').show();
+		}
+		else {
+			$('#' + this.id + '-on').hide();
+			$('#' + this.id + '-off').show();
+		}	
+	},
+	
+	'click': function (event) {
+		io.write($(this).attr('data-item'), ($(this).val() == $(this).attr('data-val-off') ? $(this).attr('data-val-on') : $(this).attr('data-val-off')) );
+	}
+});
+
+// ----- basic.switch.v1 ------------------------------------------------------
+$(document).delegate('span[data-widget="basic.switch.v1"]', {
+	'update': function (event, response) {
 		$('#' + this.id + ' img').attr('src', (response == $(this).attr('data-val-on') ? $(this).attr('data-pic-on') : $(this).attr('data-pic-off')));
 	},
 
-	'click' : function (event) {
+	'click': function (event) {
 		if ($('#' + this.id + ' img').attr('src') == $(this).attr('data-pic-off')) {
 			io.write($(this).attr('data-item'), $(this).attr('data-val-on'));
 		}
@@ -528,7 +568,7 @@ $(document).delegate('span[data-widget="basic.switch"]', {
 	}
 });
 
-$(document).delegate('span[data-widget="basic.switch"] > a > img', 'hover', function (event) {
+$(document).delegate('span[data-widget="basic.switch.v1"] > a > img', 'hover', function (event) {
 	if (event.type === 'mouseenter') {
 		$(this).addClass("ui-focus");
 	}
@@ -539,7 +579,7 @@ $(document).delegate('span[data-widget="basic.switch"] > a > img', 'hover', func
 
 // ----- basic.symbol ---------------------------------------------------------
 $(document).delegate('span[data-widget="basic.symbol"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 
 		// response will be an array, if more then one item is requested
 		var bit = ($(this).attr('data-mode') == 'and');
@@ -570,30 +610,30 @@ $(document).delegate('span[data-widget="basic.symbol"]', {
 
 // ----- basic.tank ------------------------------------------------------------
 $(document).delegate('div[data-widget="basic.tank"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// $('#' + this.id + ' div').css('height', Math.round(Math.min(response / $(this).attr('data-max'), 1) * 180));
-		$('#' + this.id + ' div').animate({height : Math.round(Math.min(response / $(this).attr('data-max'), 1) * 180)}, 'slow');
+		$('#' + this.id + ' div').animate({height: Math.round(Math.min(response / $(this).attr('data-max'), 1) * 180)}, 'slow');
 
 	}
 });
 
 // ----- basic.text -----------------------------------------------------------
 $(document).delegate('[data-widget="basic.text"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		$('#' + this.id).html((response == $(this).attr('data-val-on') ? $(this).attr('data-txt-on') : $(this).attr('data-txt-off')));
 	}
 });
 
 // ----- basic.trigger ---------------------------------------------------------
 $(document).delegate('a[data-widget="basic.trigger"]', {
-	'click' : function (event) {
+	'click': function (event) {
 		io.trigger($(this).attr('data-name'), $(this).attr('data-val'));
 	}
 });
 
 // ----- basic.value ----------------------------------------------------------
 $(document).delegate('[data-widget="basic.value"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		var unit = $(this).attr('data-unit');
 
 		if (unit == 'date' || unit == 'time' || unit == 'short' || unit == 'long') {
@@ -614,7 +654,7 @@ $(document).delegate('[data-widget="basic.value"]', {
 
 // ----- clock.iconclock ------------------------------------------------------
 $(document).delegate('span[data-widget="clock.iconclock"]', {
-	'repeat' : function (event) {
+	'repeat': function (event) {
 
 		var minutes = Math.floor((new Date() - new Date().setHours(0, 0, 0, 0)) / 1000 / 60);
 		$('#' + this.id + ' svg').trigger('update', [
@@ -628,7 +668,7 @@ $(document).delegate('span[data-widget="clock.iconclock"]', {
 
 // ----- clock.miniclock ------------------------------------------------------
 $(document).delegate('span[data-widget="clock.miniclock"]', {
-	'repeat' : function (event) {
+	'repeat': function (event) {
 
 		var now = new Date();
 		$('.miniclock').html(now.getHours() + ':' + (now.getMinutes() < 10 ? '0' + now.getMinutes() : now.getMinutes()));
@@ -640,7 +680,7 @@ $(document).delegate('span[data-widget="clock.miniclock"]', {
 
 // ----- device.codepad -------------------------------------------------------
 $(document).delegate('div[data-widget="device.codepad"]', {
-	'keyup' : function (event) {
+	'keyup': function (event) {
 		if (event.keyCode == 13) {
 			$('#' + this.id + '-ok').click();
 		}
@@ -648,7 +688,7 @@ $(document).delegate('div[data-widget="device.codepad"]', {
 });
 
 $(document).delegate('div[data-widget="device.codepad"] > div > a', {
-	'click' : function (event, response) {
+	'click': function (event, response) {
 		var node = $(this).parent().parent();
 		var code = $('#' + node.attr('id') + '-code');
 		var key = $(this).attr('data-val');
@@ -682,7 +722,7 @@ $(document).delegate('div[data-widget="device.codepad"] > div > a', {
 
 // ----- device.rtr -----------------------------------------------------------
 $(document).delegate('div[data-widget="device.rtr"] > div > a[data-icon="minus"]', {
-	'click' : function (event, response) {
+	'click': function (event, response) {
 		var uid = $(this).parent().parent().attr('id');
 		var step = $('#' + uid).attr('data-step');
 		var item = $('#' + uid + 'set').attr('data-item');
@@ -693,7 +733,7 @@ $(document).delegate('div[data-widget="device.rtr"] > div > a[data-icon="minus"]
 });
 
 $(document).delegate('div[data-widget="device.rtr"] > div > a[data-icon="plus"]', {
-	'click' : function (event, response) {
+	'click': function (event, response) {
 		var uid = $(this).parent().parent().attr('id');
 		var step = $('#' + uid).attr('data-step');
 		var item = $('#' + uid + 'set').attr('data-item');
@@ -708,7 +748,7 @@ $(document).delegate('div[data-widget="device.rtr"] > div > a[data-icon="plus"]'
 
 // ----- plot.comfortchart ----------------------------------------------------
 $(document).delegate('div[data-widget="plot.comfortchart"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_temp }}, {{ gad_humidity }}
 
 		var label = $(this).attr('data-label').explode();
@@ -716,8 +756,8 @@ $(document).delegate('div[data-widget="plot.comfortchart"]', {
 		var plots = Array();
 
 		plots[0] = {
-			type : 'area', name : label[0], lineWidth : 0,
-			data : [
+			type: 'area', name: label[0], lineWidth: 0,
+			data: [
 				[17, 35],
 				[16, 75],
 				[17, 85],
@@ -730,8 +770,8 @@ $(document).delegate('div[data-widget="plot.comfortchart"]', {
 			]
 		};
 		plots[1] = {
-			type : 'area', name : label[1], lineWidth : 0,
-			data : [
+			type: 'area', name: label[1], lineWidth: 0,
+			data: [
 				[17, 75],
 				[22.5, 65],
 				[25, 33],
@@ -741,28 +781,28 @@ $(document).delegate('div[data-widget="plot.comfortchart"]', {
 		};
 
 		plots[2] = {
-			name         : 'point',
-			data         : [
+			name: 'point',
+			data: [
 				[response[0] * 1.0, response[1] * 1.0]
 			],
-			marker       : {enabled : true, lineWidth : 2, radius : 6, symbol : 'circle'},
-			showInLegend : false
+			marker: {enabled: true, lineWidth: 2, radius: 6, symbol: 'circle'},
+			showInLegend: false
 		};
 
 		$('#' + this.id).highcharts({
-			series      : plots,
-			xAxis       : {min : 10, max : 35, title : {text : axis[0], align : 'high', margin : -2}},
-			yAxis       : {min : 0, max : 100, title : {text : axis[1], margin : 7}},
-			plotOptions : {area : {enableMouseTracking : false}},
-			tooltip     : {
-				formatter : function () {
+			series: plots,
+			xAxis: {min: 10, max: 35, title: {text: axis[0], align: 'high', margin: -2}},
+			yAxis: {min: 0, max: 100, title: {text: axis[1], margin: 7}},
+			plotOptions: {area: {enableMouseTracking: false}},
+			tooltip: {
+				formatter: function () {
 					return this.x.transUnit('temp') + ' / ' + this.y.transUnit('%');
 				}
 			}
 		});
 	},
 
-	'point' : function (event, response) {
+	'point': function (event, response) {
 		var chart = $('#' + this.id).highcharts();
 		var point = chart.series[2].data[0];
 		if (!response[0]) {
@@ -778,7 +818,7 @@ $(document).delegate('div[data-widget="plot.comfortchart"]', {
 
 // ----- plot.multiaxes ----------------------------------------------------------
 $(document).delegate('div[data-widget="plot.multiaxis"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: [ [ [t1, y1], [t2, y2] ... ], [ [t1, y1], [t2, y2] ... ], ... ] 
 
 		var ymin = [];
@@ -820,26 +860,26 @@ $(document).delegate('div[data-widget="plot.multiaxis"]', {
 		// series
 		for (i = 0; i < response.length; i++) {
 			series[i] = {
-				type  : (exposure[i] != 'stair' ? exposure[i] : 'line'),
-				step  : (exposure[i] == 'stair' ? 'left' : false),
-				name  : label[i],
-				data  : response[i],
-				color : (color[i] ? color[i] : null),
-				yAxis : (assign[i] ? assign[i] - 1 : 0)
+				type: (exposure[i] != 'stair' ? exposure[i] : 'line'),
+				step: (exposure[i] == 'stair' ? 'left' : false),
+				name: label[i],
+				data: response[i],
+				color: (color[i] ? color[i] : null),
+				yAxis: (assign[i] ? assign[i] - 1 : 0)
 			};
 		}
 
 		// y-axis
 		for (i = 0; i < axis.length - 1; i++) {
 			yaxis[i] = {
-				min         : (ymin[i] ? ymin[i] : null),
-				max         : (ymax[i] ? ymax[i] : null),
-				title       : {text : axis[i + 1]},
-				opposite    : (opposite[i] > 0),
-				minPadding  : 0.05,
-				maxPadding  : 0.05,
-				endOnTick   : false,
-				startOnTick : false
+				min: (ymin[i] ? ymin[i] : null),
+				max: (ymax[i] ? ymax[i] : null),
+				title: {text: axis[i + 1]},
+				opposite: (opposite[i] > 0),
+				minPadding: 0.05,
+				maxPadding: 0.05,
+				endOnTick: false,
+				startOnTick: false
 			};
 			if (ycolor[i]) {
 				yaxis[i].lineColor = ycolor[i];
@@ -850,25 +890,25 @@ $(document).delegate('div[data-widget="plot.multiaxis"]', {
 		// draw the plot 
 		if (zoom) {
 			$('#' + this.id).highcharts({
-				chart  : {
-					zoomType : 'x'
+				chart: {
+					zoomType: 'x'
 				},
-				series : series,
-				xAxis  : {type : 'datetime', title : {text : axis[0]}, minRange : new Date().duration(zoom).valueOf()},
-				yAxis  : yaxis
+				series: series,
+				xAxis: {type: 'datetime', title: {text: axis[0]}, minRange: new Date().duration(zoom).valueOf()},
+				yAxis: yaxis
 			});
 		}
 		else {
 			$('#' + this.id).highcharts({
-				series : series,
-				xAxis  : {type : 'datetime', title : {text : axis[0]}},
-				yAxis  : yaxis
+				series: series,
+				xAxis: {type: 'datetime', title: {text: axis[0]}},
+				yAxis: yaxis
 			});
 		}
 
 	},
 
-	'point' : function (event, response) {
+	'point': function (event, response) {
 		for (var i = 0; i < response.length; i++) {
 			if (response[i]) {
 				var chart = $('#' + this.id).highcharts();
@@ -885,7 +925,7 @@ $(document).delegate('div[data-widget="plot.multiaxis"]', {
 
 // ----- plot.period ----------------------------------------------------------
 $(document).delegate('div[data-widget="plot.period"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: [ [ [t1, y1], [t2, y2] ... ], [ [t1, y1], [t2, y2] ... ], ... ]
 
 		var label = $(this).attr('data-label').explode();
@@ -897,33 +937,33 @@ $(document).delegate('div[data-widget="plot.period"]', {
 
 		for (var i = 0; i < response.length; i++) {
 			series[i] = {
-				type  : (exposure[i] != 'stair' ? exposure[i] : 'line'),
-				step  : (exposure[i] == 'stair' ? 'left' : false),
-				name  : label[i],
-				data  : response[i],
-				color : (color[i] ? color[i] : null)
+				type: (exposure[i] != 'stair' ? exposure[i] : 'line'),
+				step: (exposure[i] == 'stair' ? 'left' : false),
+				name: label[i],
+				data: response[i],
+				color: (color[i] ? color[i] : null)
 			}
 		}
 
 		// draw the plot
 		if (zoom) {
 			$('#' + this.id).highcharts({
-				chart  : {zoomType : 'x'},
-				series : series,
-				xAxis  : {type : 'datetime', title : {text : axis[0]}, minRange : new Date().duration(zoom).valueOf()},
-				yAxis  : {min : $(this).attr('data-ymin'), max : $(this).attr('data-ymax'), title : {text : axis[1]}}
+				chart: {zoomType: 'x'},
+				series: series,
+				xAxis: {type: 'datetime', title: {text: axis[0]}, minRange: new Date().duration(zoom).valueOf()},
+				yAxis: {min: $(this).attr('data-ymin'), max: $(this).attr('data-ymax'), title: {text: axis[1]}}
 			});
 		}
 		else {
 			$('#' + this.id).highcharts({
-				series : series,
-				xAxis  : {type : 'datetime', title : {text : axis[0]}},
-				yAxis  : {min : $(this).attr('data-ymin'), max : $(this).attr('data-ymax'), title : {text : axis[1]}}
+				series: series,
+				xAxis: {type: 'datetime', title: {text: axis[0]}},
+				yAxis: {min: $(this).attr('data-ymin'), max: $(this).attr('data-ymax'), title: {text: axis[1]}}
 			});
 		}
 	},
 
-	'point' : function (event, response) {
+	'point': function (event, response) {
 		for (var i = 0; i < response.length; i++) {
 			if (response[i]) {
 				var chart = $('#' + this.id).highcharts();
@@ -940,7 +980,7 @@ $(document).delegate('div[data-widget="plot.period"]', {
 
 // ----- plot.rtr -------------------------------------------------------------
 $(document).delegate('div[data-widget="plot.rtr"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_actual }}, {{ gad_set }}, {{ gat_state }}
 
 		var label = $(this).attr('data-label').explode();
@@ -966,41 +1006,41 @@ $(document).delegate('div[data-widget="plot.rtr"]', {
 
 		// draw the plot
 		$('#' + this.id).highcharts({
-			chart   : {type : 'line'},
-			series  : [
+			chart: {type: 'line'},
+			series: [
 				{
-					name : label[0], data : response[0], type : 'spline'
+					name: label[0], data: response[0], type: 'spline'
 				},
 				{
-					name : label[1], data : response[1], dashStyle : 'shortdot', step : 'left'
+					name: label[1], data: response[1], dashStyle: 'shortdot', step: 'left'
 				},
 				{
-					type         : 'pie', name : '∑ On: ',
-					data         : [
+					type: 'pie', name: '∑ On: ',
+					data: [
 						{
-							name : 'On', y : percent
+							name: 'On', y: percent
 						},
 						{
-							name : 'Off', y : (100 - percent), color : null
+							name: 'Off', y: (100 - percent), color: null
 						}
 					],
-					center       : ['95%', '90%'],
-					size         : 35,
-					showInLegend : false,
-					dataLabels   : {enabled : false}
+					center: ['95%', '90%'],
+					size: 35,
+					showInLegend: false,
+					dataLabels: {enabled: false}
 				}
 			],
-			xAxis   : {type : 'datetime'},
-			yAxis   : {min : $(this).attr('data-min'), max : $(this).attr('data-max'), title : {text : axis[1]}},
-			tooltip : {
-				formatter : function () {
+			xAxis: {type: 'datetime'},
+			yAxis: {min: $(this).attr('data-min'), max: $(this).attr('data-max'), title: {text: axis[1]}},
+			tooltip: {
+				formatter: function () {
 					return this.series.name + ' <b>' + (this.percentage ? this.y.transUnit('%') : this.y.transUnit('temp')) + '</b>';
 				}
 			}
 		});
 	},
 
-	'point' : function (event, response) {
+	'point': function (event, response) {
 		for (var i = 0; i < response.length; i++) {
 			var chart = $('#' + this.id).highcharts();
 
@@ -1019,7 +1059,7 @@ $(document).delegate('div[data-widget="plot.rtr"]', {
 
 // ----- plot.temprose -----------------------------------------------------
 $(document).delegate('div[data-widget="plot.temprose"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_actual_1, gad_actual_2, gad_actual_3, gad_set_1, gad_set_2, gad_set_3 }}
 
 		var label = $(this).attr('data-label').explode();
@@ -1028,33 +1068,33 @@ $(document).delegate('div[data-widget="plot.temprose"]', {
 
 		var plots = Array();
 		plots[0] = {
-			name : label[0], pointPlacement : 'on',
-			data : response.slice(0, count)
+			name: label[0], pointPlacement: 'on',
+			data: response.slice(0, count)
 		};
 
 		if (response.slice(count).length == count) {
 			plots[1] = {
-				name      : label[1], pointPlacement : 'on',
-				data      : response.slice(count),
-				dashStyle : 'shortdot'
+				name: label[1], pointPlacement: 'on',
+				data: response.slice(count),
+				dashStyle: 'shortdot'
 			}
 		}
 
 		$('#' + this.id).highcharts({
-			chart   : {polar : true, type : 'line', marginLeft : 10},
-			series  : plots,
-			xAxis   : {categories : axis, tickmarkPlacement : 'on', lineWidth : 0},
-			yAxis   : {gridLineInterpolation : 'polygon', lineWidth : 0},
-			tooltip : {
-				formatter : function () {
+			chart: {polar: true, type: 'line', marginLeft: 10},
+			series: plots,
+			xAxis: {categories: axis, tickmarkPlacement: 'on', lineWidth: 0},
+			yAxis: {gridLineInterpolation: 'polygon', lineWidth: 0},
+			tooltip: {
+				formatter: function () {
 					return this.x + ' - ' + this.series.name + ': <b>' + this.y.transUnit('temp') + '</b>';
 				}
 			},
-			legend  : {x : 10, layout : 'vertical'}
+			legend: {x: 10, layout: 'vertical'}
 		});
 	},
 
-	'point' : function (event, response) {
+	'point': function (event, response) {
 		var chart = $('#' + this.id).highcharts();
 		var point = chart.series[2].data[0];
 		if (!response[0]) {
@@ -1073,19 +1113,19 @@ $(document).delegate('div[data-widget="plot.temprose"]', {
 
 // ----- status.collapse -------------------------------------------------------
 $(document).delegate('span[data-widget="status.collapse"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_trigger }}
 
 		if (response[0] != 0) {
 			$('div[data-bind="' + $(this).attr('data-id') + '"]')
-					.not('.ui-collapsible').show()
-					.trigger("expand");
+				.not('.ui-collapsible').show()
+				.trigger("expand");
 			$('div[data-bind="' + $(this).attr('data-id') + '"].ui-popup').popup("open");
 		}
 		else {
 			$('div[data-bind="' + $(this).attr('data-id') + '"]')
-					.not('.ui-collapsible').hide()
-					.trigger("collapse");
+				.not('.ui-collapsible').hide()
+				.trigger("collapse");
 			$('div[data-bind="' + $(this).attr('data-id') + '"].ui-popup').popup("close");
 		}
 	}
@@ -1093,7 +1133,7 @@ $(document).delegate('span[data-widget="status.collapse"]', {
 
 // ----- status.log -----------------------------------------------------------
 $(document).delegate('span[data-widget="status.log"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		var ret;
 		var line = '';
 
@@ -1115,12 +1155,12 @@ $(document).delegate('span[data-widget="status.log"]', {
 
 // ----- status.notify ----------------------------------------------------------
 $(document).delegate('span[data-widget="status.notify"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_trigger }}, {{ gad_message }}
 
 		if (response[0] != 0) {
 			notify.add($(this).attr('data-mode'), $(this).attr('data-signal'), $('#' + this.id + ' h1').html(),
-					'<b>' + response[1] + '</b><br  />' + $('#' + this.id + ' p').html());
+				'<b>' + response[1] + '</b><br  />' + $('#' + this.id + ' p').html());
 			notify.display();
 		}
 	}
@@ -1128,7 +1168,7 @@ $(document).delegate('span[data-widget="status.notify"]', {
 
 // ----- status.message -------------------------------------------------------
 $(document).delegate('span[data-widget="status.message"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_trigger }}, {{ gad_message }}
 
 		if (response[0] != 0) {
@@ -1148,7 +1188,7 @@ $(document).delegate('span[data-widget="status.message"]', {
 // ----------------------------------------------------------------------------
 
 $(document).delegate('svg[data-widget^="icon."]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 
 		if (response instanceof Array) {
@@ -1156,7 +1196,7 @@ $(document).delegate('svg[data-widget^="icon."]', {
 		}
 	},
 
-	'click' : function (event) {
+	'click': function (event) {
 		if ($(this).attr('data-item')) {
 			var items = $(this).attr('data-item').explode();
 
@@ -1169,37 +1209,34 @@ $(document).delegate('svg[data-widget^="icon."]', {
 
 // ----- icon.arrow -----------------------------------------------------------
 $(document).delegate('svg[data-widget="icon.arrow"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 
 		var ang = response[0] / $(this).attr('data-max') * 2 * Math.PI;
 
 		var pt = [];
-		pt = pt.concat([50, 50], fx.rotate([25, 50], ang, [50, 50]), fx.rotate([50, 18], ang, [50, 50]), fx.rotate([75,
-																													50
-		], ang, [50, 50]), [50, 50]);
+		pt = pt.concat([50, 50], fx.rotate([25, 50], ang, [50, 50]), fx.rotate([50, 18], ang, [50, 50]), fx.rotate([75, 50], ang, [50, 50]), [50, 50]);
 		$('#' + this.id + ' #line0').attr('points', pt.toString());
 
 		pt = [];
-		pt = pt.concat(fx.rotate([32, 50], ang, [50, 50]), fx.rotate([32, 60], ang, [50, 50]), fx.rotate([68, 60], ang,
-				[50, 50]), fx.rotate([68, 50], ang, [50, 50]));
+		pt = pt.concat(fx.rotate([32, 50], ang, [50, 50]), fx.rotate([32, 60], ang, [50, 50]), fx.rotate([68, 60], ang, [50, 50]), fx.rotate([68, 50], ang, [50, 50]));
 		$('#' + this.id + ' #line1').attr('points', pt.toString());
 	}
 });
 
 // ----- icon.battery ---------------------------------------------------------
 $(document).delegate('svg[data-widget="icon.battery"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 
-		var val = Math.round(response[0] / $(this).attr('data-max') * 40);
+		var val = Math.floor(response[0] / $(this).attr('data-max') * 40 / 6) * 6;
 		fx.grid(this, val, [39, 68], [61, 28]);
 	}
 });
 
 // ----- icon.blade -----------------------------------------------------------
 $(document).delegate('svg[data-widget="icon.blade"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 
 		// calculate angle in (0 - ~90°)
@@ -1208,9 +1245,7 @@ $(document).delegate('svg[data-widget="icon.blade"]', {
 
 		for (var i = 0; i <= 3; i++) {
 			pt = [];
-			pt = pt.concat(fx.rotate([37, 20 + i * 20], ang, [50, 20 + i * 20]), fx.rotate([63, 20 + i * 20], ang, [50,
-																													20 + i * 20
-			]));
+			pt = pt.concat(fx.rotate([37, 20 + i * 20], ang, [50, 20 + i * 20]), fx.rotate([63, 20 + i * 20], ang, [50, 20 + i * 20]));
 			$('#' + this.id + ' #blade' + i).attr('points', pt.toString());
 		}
 	}
@@ -1218,46 +1253,42 @@ $(document).delegate('svg[data-widget="icon.blade"]', {
 
 // ----- icon.blade_z ---------------------------------------------------------
 $(document).delegate('svg[data-widget="icon.blade_z"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 
 		// calculate angle in (0 - 90°)
 		var ang = response[0] / $(this).attr('data-max') * 0.5 * Math.PI * -1;
 
 		var pt = [];
-		pt = pt.concat(fx.rotate([25, 25], ang, [50, 30]), fx.rotate([45, 25], ang, [50, 30]), fx.rotate([55, 35], ang,
-				[50, 30]), fx.rotate([75, 35], ang, [50, 30]));
+		pt = pt.concat(fx.rotate([25, 25], ang, [50, 30]), fx.rotate([45, 25], ang, [50, 30]), fx.rotate([55, 35], ang, [50, 30]), fx.rotate([75, 35], ang, [50, 30]));
 		$('#' + this.id + ' #blade0').attr('points', pt.toString());
 
 		pt = [];
-		pt = pt.concat(fx.rotate([25, 65], ang, [50, 70]), fx.rotate([45, 65], ang, [50, 70]), fx.rotate([55, 75], ang,
-				[50, 70]), fx.rotate([75, 75], ang, [50, 70]));
+		pt = pt.concat(fx.rotate([25, 65], ang, [50, 70]), fx.rotate([45, 65], ang, [50, 70]), fx.rotate([55, 75], ang, [50, 70]), fx.rotate([75, 75], ang, [50, 70]));
 		$('#' + this.id + ' #blade1').attr('points', pt.toString());
 	}
 });
 
 // ----- icon.blade_arc -------------------------------------------------------
 $(document).delegate('svg[data-widget="icon.blade_arc"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 
 		// calculate angle in (0 - 90°)
 		var ang = response[0] / $(this).attr('data-max') * -0.7 * Math.PI + 0.35 * Math.PI;
 		var pt;
 
-		pt = 'M ' + fx.rotate([30, 40], ang, [50, 37]) + ' Q ' + fx.rotate([50, 22], ang, [50, 30]) + ' ' + fx.rotate([
-			70, 40], ang, [50, 37]);
+		pt = 'M ' + fx.rotate([30, 40], ang, [50, 37]) + ' Q ' + fx.rotate([50, 22], ang, [50, 30]) + ' ' + fx.rotate([70, 40], ang, [50, 37]);
 		$('#' + this.id + ' #blade0').attr('d', pt);
 
-		pt = 'M ' + fx.rotate([30, 80], ang, [50, 77]) + ' Q ' + fx.rotate([50, 62], ang, [50, 70]) + ' ' + fx.rotate([
-			70, 80], ang, [50, 77]);
+		pt = 'M ' + fx.rotate([30, 80], ang, [50, 77]) + ' Q ' + fx.rotate([50, 62], ang, [50, 70]) + ' ' + fx.rotate([70, 80], ang, [50, 77]);
 		$('#' + this.id + ' #blade1').attr('d', pt);
 	}
 });
 
 // ----- icon.clock -----------------------------------------------------------
 $(document).delegate('svg[data-widget="icon.clock"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 
 		var ang_l = (response[0] % 60) / 60 * 2 * Math.PI;
@@ -1270,26 +1301,24 @@ $(document).delegate('svg[data-widget="icon.clock"]', {
 
 // ----- icon.compass ---------------------------------------------------------
 $(document).delegate('svg[data-widget="icon.compass"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 
 		var ang = response[0] / $(this).attr('data-max') * 2 * Math.PI;
 
 		var pt = [];
-		pt = pt.concat(fx.rotate([40, 50], ang, [50, 50]), fx.rotate([50, 25], ang, [50, 50]), fx.rotate([60, 50], ang,
-				[50, 50]));
+		pt = pt.concat(fx.rotate([40, 50], ang, [50, 50]), fx.rotate([50, 25], ang, [50, 50]), fx.rotate([60, 50], ang, [50, 50]));
 		$('#' + this.id + ' #pin0').attr('points', pt.toString());
 
 		pt = [];
-		pt = pt.concat(fx.rotate([40, 50], ang, [50, 50]), fx.rotate([50, 75], ang, [50, 50]), fx.rotate([60, 50], ang,
-				[50, 50]));
+		pt = pt.concat(fx.rotate([40, 50], ang, [50, 50]), fx.rotate([50, 75], ang, [50, 50]), fx.rotate([60, 50], ang, [50, 50]));
 		$('#' + this.id + ' #pin1').attr('points', pt.toString());
 	}
 });
 
 // ----- icon.graph -----------------------------------------------------------
 $(document).delegate('svg[data-widget="icon.graph"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 
 		var val = Math.round(response[0] / $(this).attr('data-max') * 70);
@@ -1311,18 +1340,13 @@ $(document).delegate('svg[data-widget="icon.graph"]', {
 
 // ----- icon.light ---------------------------------------------------------
 $(document).delegate('svg[data-widget="icon.light"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 		var val = Math.round(response[0] / $(this).attr('data-max') * 10);
 		// Iterate over all child elements
 		var i = 1;
 		$('#' + this.id + ' g#light-rays line').each(function () {
-			if (val >= i) {
-				$(this).css("visibility", "visible");
-			}
-			else {
-				$(this).css("visibility", "hidden");
-			}
+			$(this).css("visibility", (val >= i ? "visible" : "hidden"));
 			i++;
 		});
 	}
@@ -1330,7 +1354,7 @@ $(document).delegate('svg[data-widget="icon.light"]', {
 
 // ----- icon.meter -----------------------------------------------------------
 $(document).delegate('svg[data-widget="icon.meter"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 
 		var ang = response[0] / $(this).attr('data-max') * 0.44 * Math.PI;
@@ -1340,7 +1364,7 @@ $(document).delegate('svg[data-widget="icon.meter"]', {
 
 // ----- icon.shutter ---------------------------------------------------------
 $(document).delegate('svg[data-widget="icon.shutter"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 
 		var val = Math.round(response[0] / $(this).attr('data-max') * 38);
@@ -1348,9 +1372,19 @@ $(document).delegate('svg[data-widget="icon.shutter"]', {
 	}
 });
 
+// ----- icon.ventilation -----------------------------------------------------
+$(document).delegate('svg[data-widget="icon.ventilation"]', {
+	'update': function (event, response) {
+		// response is: {{ gad_value }}, {{ gad_switch }}
+
+		var val = (1 - response[0] / $(this).attr('data-max')) * 4.5 + 0.5;
+		$('#' + this.id + ' #anim').attr('dur', (response[0] > 0 ? val : 0));
+	}
+});
+
 // ----- icon.volume ---------------------------------------------------------
 $(document).delegate('svg[data-widget="icon.volume"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 
 		var val = Math.round(response[0] / $(this).attr('data-max') * 71);
@@ -1359,28 +1393,36 @@ $(document).delegate('svg[data-widget="icon.volume"]', {
 	}
 });
 
+// ----- icon.windmill --------------------------------------------------------
+$(document).delegate('svg[data-widget="icon.windmill"]', {
+	'update': function (event, response) {
+		// response is: {{ gad_value }}, {{ gad_switch }}
+
+		var val = (1 - response[0] / $(this).attr('data-max')) * 4.5 + 0.5;
+		$('#' + this.id + ' #anim').attr('dur', (response[0] > 0 ? val : 0));
+	}
+});
+
 // ----- icon.windrose --------------------------------------------------------
 $(document).delegate('svg[data-widget="icon.windrose"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 
 		var ang = response[0] / $(this).attr('data-max') * 2 * Math.PI;
 
 		var pt = [];
-		pt = pt.concat(fx.rotate([50, 60], ang, [50, 50]), fx.rotate([37, 71], ang, [50, 50]), fx.rotate([50, 29], ang,
-				[50, 50]));
+		pt = pt.concat(fx.rotate([50, 60], ang, [50, 50]), fx.rotate([37, 71], ang, [50, 50]), fx.rotate([50, 29], ang, [50, 50]));
 		$('#' + this.id + ' #pin0').attr('points', pt.toString());
 
 		pt = [];
-		pt = pt.concat(fx.rotate([50, 60], ang, [50, 50]), fx.rotate([63, 71], ang, [50, 50]), fx.rotate([50, 29], ang,
-				[50, 50]));
+		pt = pt.concat(fx.rotate([50, 60], ang, [50, 50]), fx.rotate([63, 71], ang, [50, 50]), fx.rotate([50, 29], ang, [50, 50]));
 		$('#' + this.id + ' #pin1').attr('points', pt.toString());
 	}
 });
 
 // ----- icon.windsock --------------------------------------------------------
 $(document).delegate('svg[data-widget="icon.windsock"]', {
-	'update' : function (event, response) {
+	'update': function (event, response) {
 		// response is: {{ gad_value }}, {{ gad_switch }}
 
 		var ang = response[0] / $(this).attr('data-max') * 0.45 * Math.PI;
@@ -1391,17 +1433,26 @@ $(document).delegate('svg[data-widget="icon.windsock"]', {
 
 		for (var i = 0; i < 3; i++) {
 			pt = [];
-			pt = pt.concat(fx.rotate([71 + i * 2, 50 + i * 14], ang, [80, 22]), fx.rotate([89 - i * 2, 50 + i * 14
-			], ang, [80, 22]),
-					fx.rotate([88 - i * 2, 54 + i * 14], ang, [80, 22]), fx.rotate([72 + i * 2, 54 + i * 14], ang, [80,
-																													22
-					]));
+			pt = pt.concat(fx.rotate([71 + i * 2, 50 + i * 14], ang, [80, 22]), fx.rotate([89 - i * 2, 50 + i * 14], ang, [80, 22]),
+				fx.rotate([88 - i * 2, 54 + i * 14], ang, [80, 22]), fx.rotate([72 + i * 2, 54 + i * 14], ang, [80, 22]));
 			$('#' + this.id + ' #part' + i).attr('points', pt.toString());
 		}
 
 		pt = [];
-		pt = pt.concat(fx.rotate([70, 40], ang, [80, 22]), fx.rotate([76, 82], ang, [80, 22]), fx.rotate([84, 82], ang,
-				[80, 22]), fx.rotate([90, 40], ang, [80, 22]));
+		pt = pt.concat(fx.rotate([70, 40], ang, [80, 22]), fx.rotate([76, 82], ang, [80, 22]), fx.rotate([84, 82], ang, [80, 22]), fx.rotate([90, 40], ang, [80, 22]));
 		$('#' + this.id + ' #part3').attr('points', pt.toString());
+	}
+});
+
+// ----- icon.zenith ----------------------------------------------------------
+$(document).delegate('svg[data-widget="icon.zenith"]', {
+	'update': function (event, response) {
+		// response is: {{ gad_value }}, {{ gad_switch }}
+
+		var ang = response[0] / $(this).attr('data-max') * Math.PI;
+		pt = fx.rotate([10, 90], ang, [50, 90]);
+		
+		$('#' + this.id + ' #sun').attr('x', pt[0] - 50);
+		$('#' + this.id + ' #sun').attr('y', pt[1] - 50);
 	}
 });
